@@ -53,6 +53,8 @@ Callers inspect `result.error !== null` before using `result.data`; consume this
 
 Use `(authenticated)/+layout.server.ts` to return only the user fields needed by the UI. The layout can provide those fields to descendants through props or a per-tree context store. Layout loads supply UI data; each protected server operation still checks identity and permissions independently.
 
+Every page that needs to be protected needs a `+page.server.ts` in order for the hook to run. It can be empty, but the file must be present.
+
 Apply page redirects only to page requests. Remote calls need their own auth checks and failure handling rather than relying on a page-route match or a layout having run.
 
 ## Protected remote functions

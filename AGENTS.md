@@ -35,6 +35,8 @@ Authentication is not implemented. Before adding authentication, protecting rout
 - `/src/lib/components/ui/` — shadcn-svelte base components (Bits UI based)
 - `/src/lib/components/app/` — domain-specific components (sidebar, page wrappers, data tables)
 
+Custom components must follow shadcn-style composability: expose focused parts that callers assemble through Svelte 5 children/snippets. For multi-part components, export named parts from a local `index.ts` so callers can compose APIs such as `<Panel.Root>`, `<Panel.Header>`, and `<Panel.Content>`. Keep layout and content customizable at the call site rather than controlling every variation through a growing set of props or boolean flags. Forward appropriate element props and support `class` overrides on the relevant parts; build on existing UI primitives when applicable. Simple components can remain a single component when separate parts add no useful composition.
+
 ## Feature Pattern
 
 Before adding or restructuring a page, store, or remote function, read
