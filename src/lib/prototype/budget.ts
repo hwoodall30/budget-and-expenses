@@ -99,10 +99,19 @@ function validate(input: PurchaseInput) {
 		throw new Error('Allocations must equal the total.');
 }
 export function editPlan(budget: Budget, id: number, input: PurchaseInput): Budget {
-	validate(input);
 	const plan = budget.purchases.find((p) => p.id === id);
 	if (!plan || plan.kind === 'actual' || input.kind === 'actual')
 		throw new Error('This plan is no longer open.');
+	return editPurchase(budget, id, input);
+}
+export function editPurchase(budget: Budget, id: number, input: PurchaseInput): Budget {
+	validate(input);
+	const purchase = budget.purchases.find((p) => p.id === id);
+	if (!purchase) throw new Error('This purchase no longer exists.');
+	if (purchase.kind === 'actual' && input.kind !== 'actual')
+		throw new Error('Actual purchases must remain actual.');
+	if (purchase.kind !== 'actual' && input.kind === 'actual')
+		throw new Error('Use settlement to record a plan as actual.');
 	return {
 		...budget,
 		purchases: budget.purchases.map((p) =>
@@ -154,4 +163,9 @@ export function settlePlan(
 			}
 		]
 	};
+}
+export function deletePurchase(budget: Budget, id: number): Budget {
+	if (!budget.purchases.some((p) => p.id === id))
+		throw new Error('This purchase no longer exists.');
+	return { ...budget, purchases: budget.purchases.filter((p) => p.id !== id) };
 }

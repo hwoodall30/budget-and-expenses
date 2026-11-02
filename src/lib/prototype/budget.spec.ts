@@ -1,5 +1,13 @@
 import { expect, test } from 'vitest';
-import { createSampleBudget, recordPurchase, balances, editPlan, settlePlan } from './budget';
+import {
+	createSampleBudget,
+	recordPurchase,
+	balances,
+	editPlan,
+	editPurchase,
+	deletePurchase,
+	settlePlan
+} from './budget';
 
 test('actual split spending reduces annual funds once', () => {
 	const budget = recordPurchase(createSampleBudget(), {
@@ -142,4 +150,74 @@ test('overspending stays visible as a negative balance', () => {
 		allocations: [{ category: 'Admin', amount: 200000 }]
 	});
 	expect(balances(budget).available).toBe(-45000);
+});
+
+test('settled actual purchases remain editable without changing the retained plan', () => {
+	const settled = settlePlan(
+		createSampleBudget(),
+		2,
+		{
+			description: 'Equipment',
+			date: '2026-11-02',
+			amount: 18000,
+			kind: 'actual',
+			allocations: [{ category: 'Admin', amount: 18000 }]
+		},
+		{ amount: 12000, allocations: [{ category: 'Classroom Supplies', amount: 12000 }] }
+	);
+	const edited = editPurchase(settled, 2, {
+		description: 'Corrected equipment',
+		date: '2026-11-03',
+		amount: 20000,
+		kind: 'actual',
+		allocations: [
+			{ category: 'Admin', amount: 5000 },
+			{ category: 'Classroom Supplies', amount: 15000 }
+		]
+	});
+	expect(balances(edited)).toEqual({
+		actual: 35000,
+		committed: 12000,
+		expected: 20000,
+		available: 153000,
+		projected: 133000
+	});
+	expect(edited.purchases.find((p) => p.id === 2)).toMatchObject({
+		description: 'Corrected equipment',
+		originalEstimate: 30000,
+		date: '2026-11-03'
+	});
+	expect(edited.purchases.find((p) => p.id === 2)?.history).toHaveLength(2);
+	expect(() => editPurchase(edited, 2, { ...edited.purchases[1], kind: 'expected' })).toThrow(
+		'Actual purchases must remain actual.'
+	);
+});
+
+test('deleting a settled actual removes its spending but preserves the remainder', () => {
+	const settled = settlePlan(
+		createSampleBudget(),
+		2,
+		{
+			description: 'Equipment',
+			date: '2026-11-02',
+			amount: 18000,
+			kind: 'actual',
+			allocations: [{ category: 'Admin', amount: 18000 }]
+		},
+		{ amount: 12000, allocations: [{ category: 'Classroom Supplies', amount: 12000 }] }
+	);
+	const deleted = deletePurchase(settled, 2);
+	expect(balances(deleted)).toEqual({
+		actual: 15000,
+		committed: 12000,
+		expected: 20000,
+		available: 173000,
+		projected: 153000
+	});
+	expect(deleted.purchases.some((p) => p.id === 2)).toBe(false);
+	expect(() => deletePurchase(deleted, 2)).toThrow('This purchase no longer exists.');
+});
+
+test.each([1, 2, 3])('any purchase or plan can be deleted (%s)', (id) => {
+	expect(deletePurchase(createSampleBudget(), id).purchases.map((p) => p.id)).not.toContain(id);
 });

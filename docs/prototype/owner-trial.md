@@ -11,7 +11,7 @@ Give the owner these outcomes, without explaining controls. Reset the sample dat
 1. Record $42.75 for Sunday snacks today under Sunday Consumables.
 2. Record a $100 purchase split into $60 Sunday Consumables and $40 Classroom Supplies.
 3. Plan $300 for volunteer dinner as expected, change the estimate to $320, then mark it committed.
-4. Settle the sample committed classroom purchase: record $180 actually purchased, edit its date/description/category as needed, and retain $120 as a reviewed commitment. Also try settlement without retaining a remainder.
+4. Settle the sample committed classroom purchase: record $180 actually purchased, edit its date/description/category as needed, and retain $120 as a reviewed commitment. Also try settlement without retaining a remainder. Edit the settled purchase, then delete it; confirm that its retained remainder stays planned.
 5. Find available and projected funds and explain which includes expected purchases. Check that settlement counted the actual and remaining commitment once each.
 
 ## Observation log
@@ -36,6 +36,8 @@ These are implemented hypotheses, awaiting owner validation:
 - Settlement prefills editable final fields. Closing the plan is the default; retaining a remainder requires explicit amount and category allocation review.
 - Split allocations must equal the purchase total, including the separately reviewed remainder.
 - Annual available funds subtract actual spending and outstanding commitments; projected funds also subtract expected purchases.
+- All records remain editable and deletable. Actual purchases stay actual when corrected; deleting one does not reopen its original plan or delete a retained remainder.
+- The UI composes shadcn-svelte primitives with Tailwind layouts and semantic theme tokens.
 - Category review shows spending and plans without implying category budget limits.
 
 ## Validated decisions

@@ -1,10 +1,22 @@
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import * as NativeSelect from '#lib/components/ui/native-select/index.js';
+	import * as Alert from '#lib/components/ui/alert/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
+	import { PurchaseAllocationRows } from '#lib/components/app/purchase-allocations/index.js';
+
 	import { attempt } from '#lib/helpers/attempt.ts';
 	import {
 		balances,
 		categories,
 		createSampleBudget,
-		editPlan,
+		editPurchase,
+		deletePurchase,
 		recordPurchase,
 		settlePlan,
 		type Allocation,
@@ -31,6 +43,9 @@
 	let remainingRows = $state([{ category: categories[0], amount: '' }]);
 	let error = $state('');
 	let notice = $state('');
+	const editingActual = $derived(
+		mode === 'edit' && budget.purchases.find((p) => p.id === selected)?.kind === 'actual'
+	);
 	function cents(value: string) {
 		if (!/^\d+(\.\d{1,2})?$/.test(value))
 			throw new Error('Enter positive USD amounts with at most two decimal places.');
@@ -43,6 +58,11 @@
 			amount: cents(items.length === 1 ? total : r.amount)
 		}));
 	}
+	function splitRows(items: typeof rows, total: string) {
+		const existing = items.length === 1 ? [{ ...items[0], amount: total }] : items;
+		return [...existing, { category: categories[0], amount: '' }];
+	}
+
 	function resetForm() {
 		description = '';
 		date = today();
@@ -85,7 +105,7 @@
 				kind,
 				allocations: allocations(rows, amount)
 			};
-			if (mode === 'edit' && selected !== null) return editPlan(budget, selected, input);
+			if (mode === 'edit' && selected !== null) return editPurchase(budget, selected, input);
 			if (mode === 'settle' && selected !== null)
 				return settlePlan(
 					budget,
@@ -106,571 +126,369 @@
 			mode === 'settle'
 				? 'Settlement recorded in sample data.'
 				: mode === 'edit'
-					? 'Plan updated in sample data.'
+					? kind === 'actual'
+						? 'Purchase updated in sample data.'
+						: 'Plan updated in sample data.'
 					: 'Added to sample data.';
 		resetForm();
 	}
+
+	function remove(id: number) {
+		const result = attempt<string, typeof budget>(() => deletePurchase(budget, id));
+		if (result.error !== null) {
+			error = result.error;
+			return;
+		}
+		budget = result.data;
+		if (selected === id) resetForm();
+		notice = 'Deleted from sample data.';
+	}
 </script>
 
-<div class="prototype">
-	<header>
-		<div class="brand">MINISTRY / STEWARDSHIP</div>
-		<span class="badge">Sample data only</span>
+<div class="mx-auto max-w-7xl px-4 sm:px-8">
+	<header class="flex flex-wrap items-center justify-between gap-3 border-b py-6">
+		<p class="text-xs font-semibold tracking-widest">MINISTRY / STEWARDSHIP</p>
+		<Badge variant="secondary">Sample data only</Badge>
 	</header>
-	<main>
-		<div class="intro">
-			<div>
-				<p class="eyebrow">WORKFLOW PROTOTYPE</p>
-				<h1>A little clarity for<br />every ministry dollar.</h1>
-				<p>Plan thoughtfully. Record simply. See what’s available.</p>
-			</div>
-			<div class="sample-note">
-				<strong>Try it freely.</strong>
-				<p>
-					Fictional USD data · Calendar year 2026.<br />Changes stay in this page only. Refreshing
-					discards them.
+	<main class="flex flex-col gap-6 py-8 sm:py-12">
+		<div class="flex flex-col justify-between gap-6 md:flex-row md:items-center">
+			<div class="flex flex-col gap-4">
+				<p class="text-xs font-semibold tracking-widest text-muted-foreground">
+					WORKFLOW PROTOTYPE
 				</p>
-				<button
-					class="secondary"
-					onclick={() => {
-						budget = createSampleBudget();
-						resetForm();
-						notice = 'Sample data reset.';
-					}}>Reset sample data</button
-				>
+				<h1 class="text-3xl font-semibold tracking-tight sm:text-5xl">
+					A little clarity for<br />every ministry dollar.
+				</h1>
+				<p class="text-muted-foreground">Plan thoughtfully. Record simply. See what’s available.</p>
 			</div>
+			<Card.Root class="md:max-w-sm">
+				<Card.Header
+					><Card.Title>Try it freely.</Card.Title><Card.Description
+						>Fictional USD data · Calendar year 2026. Changes stay in this page only. Refreshing
+						discards them.</Card.Description
+					></Card.Header
+				>
+				<Card.Footer
+					><Button
+						variant="outline"
+						onclick={() => {
+							budget = createSampleBudget();
+							resetForm();
+							notice = 'Sample data reset.';
+						}}>Reset sample data</Button
+					></Card.Footer
+				>
+			</Card.Root>
 		</div>
-		<section aria-label="Annual budget summary" class="summary">
-			<article>
-				<p>Annual budget · 2026</p>
-				<strong>{money(budget.annual)}</strong><small>Actual spending {money(totals.actual)}</small>
-			</article>
-			<article class="highlight">
-				<p>Available to spend</p>
-				<strong data-testid="available">{money(totals.available)}</strong><small
-					>Budget − actual − committed</small
-				>
-			</article>
-			<article>
-				<p>Projected balance</p>
-				<strong>{money(totals.projected)}</strong><small
-					>Available − expected {money(totals.expected)}</small
-				>
-			</article>
+		<section aria-label="Annual budget summary" class="grid gap-4 md:grid-cols-3">
+			<Card.Root
+				><Card.Header><Card.Description>Annual budget · 2026</Card.Description></Card.Header
+				><Card.Content
+					><strong class="text-3xl tracking-tight">{money(budget.annual)}</strong></Card.Content
+				><Card.Footer
+					><p class="text-sm text-muted-foreground">
+						Actual spending {money(totals.actual)}
+					</p></Card.Footer
+				></Card.Root
+			>
+			<Card.Root
+				><Card.Header><Card.Description>Available to spend</Card.Description></Card.Header
+				><Card.Content
+					><strong class="text-3xl tracking-tight" data-testid="available"
+						>{money(totals.available)}</strong
+					></Card.Content
+				><Card.Footer
+					><p class="text-sm text-muted-foreground">Budget − actual − committed</p></Card.Footer
+				></Card.Root
+			>
+			<Card.Root
+				><Card.Header><Card.Description>Projected balance</Card.Description></Card.Header
+				><Card.Content
+					><strong class="text-3xl tracking-tight">{money(totals.projected)}</strong></Card.Content
+				><Card.Footer
+					><p class="text-sm text-muted-foreground">
+						Available − expected {money(totals.expected)}
+					</p></Card.Footer
+				></Card.Root
+			>
 		</section>
-		<div class="workspace">
-			<section class="panel entry">
-				<p class="eyebrow">
-					{mode === 'settle' ? 'TURN A PLAN INTO A PURCHASE' : 'KEEP THE DETAILS SIMPLE'}
-				</p>
-				<h2 id="entry-title" tabindex="-1">
-					{mode === 'settle'
-						? 'Settle a plan'
-						: mode === 'edit'
-							? 'Edit a plan'
-							: 'Add a purchase or plan'}
-				</h2>
-				<form onsubmit={save}>
-					{#if mode !== 'settle'}<label
-							>Record type<select bind:value={kind}
-								><option value="actual" disabled={mode === 'edit'}>Actual purchase</option><option
-									value="expected">Expected · tentative</option
-								><option value="committed">Committed · agreed or ordered</option></select
-							></label
-						>{:else}<p>
-							Actual purchase · review final details below. The original plan will close.
-						</p>{/if}
-					<label
-						>Description<input
-							required
-							bind:value={description}
-							placeholder="What is this for?"
-						/></label
-					>
-					<div class="pair">
-						<label
-							>Total (USD)<input
-								required
-								inputmode="decimal"
-								bind:value={amount}
-								placeholder="0.00"
-							/></label
-						><label
-							>{kind === 'actual' ? 'Purchase date' : 'Anticipated date'}<input
-								required
-								type="date"
-								min="2026-01-01"
-								max="2026-12-31"
-								bind:value={date}
-							/></label
-						>
-					</div>
-					<fieldset>
-						<legend>Category allocations</legend>
-						{#each rows as row, i (row)}<div class="allocation">
-								<label
-									>Category {i + 1}<select bind:value={row.category}
-										>{#each categories as category (category)}<option>{category}</option
-											>{/each}</select
-									></label
-								>{#if rows.length > 1}<label
-										>Amount {i + 1} (USD)<input
-											required
-											inputmode="decimal"
-											bind:value={row.amount}
-										/></label
-									><button
-										class="secondary"
-										type="button"
-										aria-label={`Remove category ${i + 1}`}
-										onclick={() => (rows = rows.filter((_, index) => index !== i))}>Remove</button
-									>{/if}
-							</div>{/each}
-						<button
-							class="text-button"
-							type="button"
-							onclick={() => {
-								if (rows.length === 1) rows[0].amount = amount;
-								rows = [...rows, { category: categories[0], amount: '' }];
-							}}>+ Split across categories</button
-						><small>Split amounts must equal the total.</small>
-					</fieldset>
-					{#if mode === 'settle'}
-						<label class="check"
-							><input type="checkbox" bind:checked={keep} />Keep a planned remainder</label
-						>
-						{#if keep}<fieldset>
-								<legend>Review the remaining plan</legend>
-								<p>
-									The remainder keeps the original plan’s expected or committed status. Enter its
-									amount and allocations explicitly.
-								</p>
-								<label
-									>Remaining total (USD)<input
+		<div class="grid items-start gap-6 lg:grid-cols-2">
+			<Card.Root class="min-w-0">
+				<Card.Header
+					><Card.Description
+						>{mode === 'settle'
+							? 'TURN A PLAN INTO A PURCHASE'
+							: 'KEEP THE DETAILS SIMPLE'}</Card.Description
+					><Card.Title
+						><h2 id="entry-title" tabindex="-1">
+							{mode === 'settle'
+								? 'Settle a plan'
+								: mode === 'edit'
+									? editingActual
+										? 'Edit a purchase'
+										: 'Edit a plan'
+									: 'Add a purchase or plan'}
+						</h2></Card.Title
+					></Card.Header
+				>
+				<Card.Content>
+					<form onsubmit={save}>
+						<Field.FieldGroup>
+							{#if mode !== 'settle' && !editingActual}
+								<Field.Field>
+									<Field.FieldLabel for="record-type">Record type</Field.FieldLabel>
+									<NativeSelect.Root id="record-type" class="w-full" bind:value={kind}>
+										<NativeSelect.Option value="actual" disabled={mode === 'edit'}
+											>Actual purchase</NativeSelect.Option
+										>
+										<NativeSelect.Option value="expected">Expected · tentative</NativeSelect.Option>
+										<NativeSelect.Option value="committed"
+											>Committed · agreed or ordered</NativeSelect.Option
+										>
+									</NativeSelect.Root>
+								</Field.Field>
+							{:else}<Field.FieldDescription
+									>{mode === 'settle'
+										? 'Actual purchase · review final details below. The original plan will close.'
+										: 'Edit the recorded purchase. It remains actual spending.'}</Field.FieldDescription
+								>{/if}
+							<Field.Field data-invalid={!!error}>
+								<Field.FieldLabel for="description">Description</Field.FieldLabel>
+								<Input
+									id="description"
+									required
+									bind:value={description}
+									placeholder="What is this for?"
+									aria-invalid={!!error}
+								/>
+							</Field.Field>
+							<Field.FieldGroup class="sm:flex-row">
+								<Field.Field data-invalid={!!error}
+									><Field.FieldLabel for="amount">Total (USD)</Field.FieldLabel><Input
+										id="amount"
 										required
 										inputmode="decimal"
-										bind:value={remaining}
-									/></label
+										bind:value={amount}
+										placeholder="0.00"
+										aria-invalid={!!error}
+									/></Field.Field
 								>
-								{#each remainingRows as row, i (row)}<div class="allocation">
-										<label
-											>Remaining category {i + 1}<select bind:value={row.category}
-												>{#each categories as category (category)}<option>{category}</option
-													>{/each}</select
-											></label
-										>{#if remainingRows.length > 1}<label
-												>Remaining amount {i + 1} (USD)<input
+								<Field.Field data-invalid={!!error}
+									><Field.FieldLabel for="date"
+										>{kind === 'actual' ? 'Purchase date' : 'Anticipated date'}</Field.FieldLabel
+									><Input
+										id="date"
+										required
+										type="date"
+										min="2026-01-01"
+										max="2026-12-31"
+										bind:value={date}
+										aria-invalid={!!error}
+									/></Field.Field
+								>
+							</Field.FieldGroup>
+							<Field.FieldSet>
+								<Field.FieldLegend variant="label">Category allocations</Field.FieldLegend>
+								<PurchaseAllocationRows bind:rows invalid={!!error}>
+									<Button
+										class="self-start"
+										variant="ghost"
+										type="button"
+										onclick={() => (rows = splitRows(rows, amount))}
+										>+ Split across categories</Button
+									>
+								</PurchaseAllocationRows>
+								<Field.FieldDescription>Split amounts must equal the total.</Field.FieldDescription>
+							</Field.FieldSet>
+							{#if mode === 'settle'}
+								<Field.Field orientation="horizontal"
+									><Checkbox id="keep-remainder" bind:checked={keep} /><Field.FieldLabel
+										for="keep-remainder">Keep a planned remainder</Field.FieldLabel
+									></Field.Field
+								>
+								{#if keep}
+									<Field.FieldSet>
+										<Field.FieldLegend>Review the remaining plan</Field.FieldLegend>
+										<Field.FieldDescription
+											>The remainder keeps the original plan’s expected or committed status. Enter
+											its amount and allocations explicitly.</Field.FieldDescription
+										>
+										<Field.FieldGroup>
+											<Field.Field data-invalid={!!error}
+												><Field.FieldLabel for="remaining">Remaining total (USD)</Field.FieldLabel
+												><Input
+													id="remaining"
 													required
 													inputmode="decimal"
-													bind:value={row.amount}
-												/></label
-											><button
-												type="button"
-												class="secondary"
-												onclick={() =>
-													(remainingRows = remainingRows.filter((_, index) => index !== i))}
-												>Remove</button
-											>{/if}
-									</div>{/each}
-								<button
-									class="text-button"
-									type="button"
-									onclick={() => {
-										if (remainingRows.length === 1) remainingRows[0].amount = remaining;
-										remainingRows = [...remainingRows, { category: categories[0], amount: '' }];
-									}}>+ Split remaining amount</button
+													bind:value={remaining}
+													aria-invalid={!!error}
+												/></Field.Field
+											>
+											<Field.FieldSet>
+												<Field.FieldLegend variant="label">Remaining allocations</Field.FieldLegend>
+												<PurchaseAllocationRows
+													bind:rows={remainingRows}
+													categoryLabel="Remaining category"
+													amountLabel="Remaining amount"
+													invalid={!!error}
+												>
+													<Button
+														class="self-start"
+														variant="ghost"
+														type="button"
+														onclick={() => (remainingRows = splitRows(remainingRows, remaining))}
+														>+ Split remaining amount</Button
+													>
+												</PurchaseAllocationRows>
+												<Field.FieldDescription
+													>Remaining allocations must equal the remaining total.</Field.FieldDescription
+												>
+											</Field.FieldSet>
+										</Field.FieldGroup>
+									</Field.FieldSet>
+								{/if}
+							{/if}
+							{#if error}<Alert.Root variant="destructive"
+									><Alert.Title>Check this entry</Alert.Title><Alert.Description
+										>{error}</Alert.Description
+									></Alert.Root
+								>{/if}
+							<Field.Field orientation="horizontal" class="flex-wrap">
+								<Button type="submit"
+									>{mode === 'settle'
+										? 'Record settlement'
+										: mode === 'edit'
+											? editingActual
+												? 'Update purchase'
+												: 'Update plan'
+											: kind === 'actual'
+												? 'Add purchase'
+												: 'Add plan'}</Button
 								>
-							</fieldset>{/if}
-					{/if}
-					{#if error}<p role="alert" class="error">{error}</p>{/if}
-					<div class="actions">
-						<button type="submit"
-							>{mode === 'settle'
-								? 'Record settlement'
-								: mode === 'edit'
-									? 'Update plan'
-									: kind === 'actual'
-										? 'Add purchase'
-										: 'Add plan'}</button
-						>{#if mode !== 'add'}<button type="button" class="secondary" onclick={resetForm}
-								>Cancel</button
-							>{/if}
-					</div>
-				</form>
-				<p role="status" aria-live="polite">{notice}</p>
-			</section>
-			<section class="panel">
-				<div class="section-title">
-					<div>
-						<p class="eyebrow">ACTUALS & WHAT’S AHEAD</p>
-						<h2>Purchases & plans</h2>
-					</div>
-					<span>{budget.purchases.length} records</span>
-				</div>
-				<p>Committed {money(totals.committed)} · Expected {money(totals.expected)}</p>
-				{#each budget.purchases as purchase (purchase.id)}<article class="record">
-						<div class="record-heading">
-							<span class="badge {purchase.kind}">{purchase.kind}</span><strong
-								>{money(purchase.amount)}</strong
+								{#if mode !== 'add'}<Button type="button" variant="outline" onclick={resetForm}
+										>Cancel</Button
+									>{/if}
+							</Field.Field>
+						</Field.FieldGroup>
+					</form>
+				</Card.Content>
+				<Card.Footer
+					><p role="status" aria-live="polite" class="text-sm text-muted-foreground">
+						{notice}
+					</p></Card.Footer
+				>
+			</Card.Root>
+			<Card.Root class="min-w-0">
+				<Card.Header
+					><Card.Description>ACTUALS & WHAT’S AHEAD</Card.Description><Card.Title
+						><h2>Purchases & plans</h2></Card.Title
+					><Card.Description
+						>{budget.purchases.length} records · Committed {money(totals.committed)} · Expected {money(
+							totals.expected
+						)}</Card.Description
+					></Card.Header
+				>
+				<Card.Content class="flex flex-col gap-4">
+					{#each budget.purchases as purchase (purchase.id)}
+						<Card.Root>
+							<Card.Header
+								><div class="flex items-center justify-between gap-3">
+									<Badge
+										variant={purchase.kind === 'actual'
+											? 'default'
+											: purchase.kind === 'committed'
+												? 'secondary'
+												: 'outline'}>{purchase.kind}</Badge
+									><strong>{money(purchase.amount)}</strong>
+								</div>
+								<Card.Title><h3 class="break-words">{purchase.description}</h3></Card.Title
+								><Card.Description
+									>{purchase.date} · {purchase.allocations
+										.map((a) => `${a.category} ${money(a.amount)}`)
+										.join(' / ')}</Card.Description
+								></Card.Header
 							>
-						</div>
-						<h3>{purchase.description}</h3>
-						<p>
-							{purchase.date} · {purchase.allocations
-								.map((a) => `${a.category} ${money(a.amount)}`)
-								.join(' / ')}
-						</p>
-						{#if purchase.kind !== 'actual'}<div class="actions">
-								<button
-									class="secondary"
+							<Card.Content
+								><details class="text-sm text-muted-foreground">
+									<summary class="cursor-pointer">Details & history</summary>
+									<div class="mt-3 flex flex-col gap-2">
+										<p>Original amount / estimate: {money(purchase.originalEstimate)}</p>
+										{#each purchase.history as revision, index (index)}<p>{revision}</p>{:else}<p>
+												No revisions yet.
+											</p>{/each}
+									</div>
+								</details></Card.Content
+							>
+							<Card.Footer class="flex-wrap gap-2">
+								<Button
+									variant="outline"
 									aria-label={`Edit ${purchase.description}`}
-									onclick={() => open(purchase, 'edit')}>Edit plan</button
-								><button
-									class="secondary"
-									aria-label={`Settle ${purchase.description}`}
-									onclick={() => open(purchase, 'settle')}>Settle as actual</button
+									onclick={() => open(purchase, 'edit')}
+									>{purchase.kind === 'actual' ? 'Edit purchase' : 'Edit plan'}</Button
 								>
-							</div>{/if}
-						<details>
-							<summary>Details & history</summary>
-							<p>Original amount / estimate: {money(purchase.originalEstimate)}</p>
-							{#each purchase.history as revision, index (index)}<p>{revision}</p>{:else}<p>
-									No revisions yet.
-								</p>{/each}
-						</details>
-					</article>{/each}
-			</section>
+								{#if purchase.kind !== 'actual'}<Button
+										variant="outline"
+										aria-label={`Settle ${purchase.description}`}
+										onclick={() => open(purchase, 'settle')}>Settle as actual</Button
+									>{/if}
+								<Button
+									variant="destructive"
+									aria-label={`Delete ${purchase.description}`}
+									onclick={() => remove(purchase.id)}>Delete</Button
+								>
+							</Card.Footer>
+						</Card.Root>
+					{:else}
+						<Empty.Root
+							><Empty.Header
+								><Empty.Title>No purchases or plans</Empty.Title><Empty.Description
+									>Add a purchase or plan using the entry form, or reset the sample data.</Empty.Description
+								></Empty.Header
+							></Empty.Root
+						>
+					{/each}
+				</Card.Content>
+			</Card.Root>
 		</div>
-		<section class="panel category-review">
-			<p class="eyebrow">ANNUAL CATEGORY REVIEW · 2026</p>
-			<h2>Where the money goes</h2>
-			<p>Spending and outstanding plans, without category budget limits.</p>
-			<div class="category-grid">
-				{#each categories as category (category)}{@const entries = budget.purchases.flatMap((p) =>
+		<Card.Root>
+			<Card.Header
+				><Card.Description>ANNUAL CATEGORY REVIEW · 2026</Card.Description><Card.Title
+					><h2>Where the money goes</h2></Card.Title
+				><Card.Description
+					>Spending and outstanding plans, without category budget limits.</Card.Description
+				></Card.Header
+			>
+			<Card.Content class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+				{#each categories as category (category)}
+					{@const entries = budget.purchases.flatMap((p) =>
 						p.allocations
 							.filter((a) => a.category === category)
 							.map((a) => ({ ...a, kind: p.kind }))
-					)}{#if entries.length}<article>
-							<h3>{category}</h3>
-							{#each ['actual', 'committed', 'expected'] as status (status)}<p>
-									{status}<strong
-										>{money(
-											entries.filter((e) => e.kind === status).reduce((sum, e) => sum + e.amount, 0)
-										)}</strong
+					)}
+					{#if entries.length}<Card.Root
+							><Card.Header><Card.Title><h3>{category}</h3></Card.Title></Card.Header><Card.Content
+								class="flex flex-col gap-2"
+								>{#each ['actual', 'committed', 'expected'] as status (status)}<p
+										class="flex justify-between gap-2 text-sm"
 									>
-								</p>{/each}
-						</article>{/if}{/each}
-			</div>
-		</section>
-		<footer>Prototype for owner testing · No production records are saved.</footer>
+										<span class="text-muted-foreground">{status}</span><strong
+											>{money(
+												entries
+													.filter((e) => e.kind === status)
+													.reduce((sum, e) => sum + e.amount, 0)
+											)}</strong
+										>
+									</p>{/each}</Card.Content
+							></Card.Root
+						>{/if}
+				{/each}
+				{#if !budget.purchases.length}<p class="text-sm text-muted-foreground">
+						No category spending or plans yet.
+					</p>{/if}
+			</Card.Content>
+		</Card.Root>
+		<footer class="text-xs text-muted-foreground">
+			Prototype for owner testing · No production records are saved.
+		</footer>
 	</main>
 </div>
-
-<style>
-	:global(body) {
-		background: #f5f6f2;
-		color: #203e35;
-	}
-	.prototype {
-		max-width: 1400px;
-		margin: auto;
-		padding: 0 4vw;
-	}
-	header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 26px 0;
-		border-bottom: 1px solid #d9e0d7;
-		gap: 12px;
-	}
-	.brand,
-	.eyebrow {
-		font-size: 0.72rem;
-		font-weight: 700;
-		letter-spacing: 0.14em;
-	}
-	.badge {
-		font-size: 0.73rem;
-		background: #e7ecdf;
-		border-radius: 20px;
-		padding: 5px 10px;
-		white-space: nowrap;
-	}
-	.intro {
-		display: flex;
-		justify-content: space-between;
-		gap: 30px;
-		margin: 48px 0 32px;
-	}
-	h1 {
-		font-size: clamp(2rem, 4vw, 3.4rem);
-		line-height: 1.12;
-		letter-spacing: -0.045em;
-		margin: 10px 0 20px;
-	}
-	p {
-		font-size: 0.9rem;
-		line-height: 1.6;
-		color: #52665d;
-	}
-	.sample-note {
-		max-width: 330px;
-		padding-top: 20px;
-	}
-	.summary {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 18px;
-		margin-bottom: 28px;
-	}
-	.summary article,
-	.panel {
-		background: white;
-		border: 1px solid #dbe2d8;
-		border-radius: 16px;
-		padding: 24px;
-	}
-	.summary p {
-		margin: 0 0 12px;
-	}
-	.summary strong {
-		display: block;
-		font-size: 2rem;
-		letter-spacing: -0.04em;
-	}
-	.summary small {
-		display: block;
-		margin-top: 14px;
-	}
-	.summary .highlight {
-		background: #234b3c;
-		color: white;
-	}
-	.highlight p,
-	.highlight small {
-		color: #d5e4d8;
-	}
-	small {
-		font-size: 0.76rem;
-		color: #67776d;
-	}
-	.workspace {
-		display: grid;
-		grid-template-columns: 1fr 1.15fr;
-		gap: 24px;
-		align-items: start;
-	}
-	h2 {
-		font-size: 1.3rem;
-		letter-spacing: -0.025em;
-		margin: 8px 0 20px;
-	}
-	h3 {
-		font-size: 1rem;
-		font-weight: 650;
-		margin: 10px 0 4px;
-	}
-	form,
-	label {
-		display: grid;
-		gap: 7px;
-	}
-	form {
-		gap: 18px;
-	}
-	label {
-		font-size: 0.8rem;
-		font-weight: 600;
-	}
-	input,
-	select {
-		width: 100%;
-		min-width: 0;
-		border: 1px solid #cbd6ca;
-		border-radius: 7px;
-		background: #fff;
-		padding: 10px;
-		color: #203e35;
-		font-size: 0.9rem;
-	}
-	input:focus,
-	select:focus {
-		outline: 2px solid #6b8a62;
-		outline-offset: 2px;
-	}
-	.pair {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 12px;
-	}
-	button {
-		background: #284d3c;
-		color: white;
-		border-radius: 7px;
-		padding: 10px 15px;
-		font-size: 0.82rem;
-		font-weight: 600;
-		cursor: pointer;
-	}
-	button:hover {
-		filter: brightness(0.94);
-	}
-	button:focus-visible {
-		outline: 3px solid #92a26c;
-		outline-offset: 2px;
-	}
-	.secondary {
-		background: #f0f3eb;
-		color: #284d3c;
-		border: 1px solid #d5ddcf;
-	}
-	.text-button {
-		background: transparent;
-		color: #365c43;
-		padding: 10px 0;
-		text-align: left;
-	}
-	fieldset {
-		border: 1px solid #dbe2d8;
-		border-radius: 9px;
-		padding: 14px;
-		min-width: 0;
-	}
-	legend {
-		font-size: 0.8rem;
-		font-weight: 600;
-		padding: 0 5px;
-	}
-	.allocation {
-		display: flex;
-		gap: 8px;
-		align-items: end;
-		margin-bottom: 10px;
-		flex-wrap: wrap;
-	}
-	.allocation label {
-		flex: 1;
-		min-width: 100px;
-	}
-	.allocation label:first-child {
-		flex: 2;
-	}
-	fieldset small {
-		display: block;
-	}
-	.check {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
-	.check input {
-		width: 18px;
-		height: 18px;
-	}
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-	}
-	.error {
-		background: #fff0e9;
-		color: #8c3221;
-		padding: 12px;
-		border-radius: 7px;
-	}
-	.section-title,
-	.record-heading {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 12px;
-	}
-	.section-title span {
-		font-size: 0.76rem;
-	}
-	.record {
-		border-top: 1px solid #e0e6dc;
-		padding: 20px 0;
-	}
-	.record p {
-		font-size: 0.8rem;
-	}
-	.record .actions {
-		margin: 12px 0;
-	}
-	details {
-		font-size: 0.75rem;
-		color: #5b6d60;
-		margin-top: 12px;
-	}
-	summary {
-		cursor: pointer;
-	}
-	.actual {
-		background: #e5efe8;
-	}
-	.expected {
-		background: #f8efd7;
-	}
-	.committed {
-		background: #e6eaf5;
-	}
-	.category-review {
-		margin-top: 24px;
-	}
-	.category-grid {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 20px;
-	}
-	.category-grid article {
-		border-top: 1px solid #dbe2d8;
-		padding-top: 8px;
-	}
-	.category-grid p {
-		display: flex;
-		justify-content: space-between;
-		gap: 8px;
-		margin: 6px 0;
-	}
-	footer {
-		padding: 30px 0;
-		font-size: 0.75rem;
-		color: #67776d;
-	}
-	@media (max-width: 760px) {
-		.intro {
-			display: block;
-			margin: 28px 0;
-		}
-		.sample-note {
-			max-width: none;
-		}
-		.summary {
-			grid-template-columns: 1fr;
-			gap: 10px;
-		}
-		.summary article {
-			padding: 18px;
-		}
-		.workspace {
-			grid-template-columns: 1fr;
-		}
-		.panel {
-			padding: 18px;
-		}
-		.category-grid {
-			grid-template-columns: 1fr;
-		}
-		.pair {
-			grid-template-columns: 1fr;
-		}
-		.brand {
-			font-size: 0.6rem;
-		}
-		.record-heading strong {
-			font-size: 1.15rem;
-		}
-	}
-</style>
