@@ -1,2 +1,11 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<script lang="ts">
+	import PrototypePage from './_components/prototype-page.svelte';
+</script>
+
+<svelte:head
+	><title>Ministry budget · Workflow prototype</title><meta
+		name="description"
+		content="Disposable ministry budget workflow prototype with fictional sample data."
+	/></svelte:head
+>
+<PrototypePage />
