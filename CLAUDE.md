@@ -49,5 +49,5 @@ Before adding or changing fallible operations or error handling on the server or
 - **TypeScript**: strict mode, `moduleResolution: bundler`
 - **Tailwind CSS v4** via `@tailwindcss/vite` plugin
 - **Prettier**: tabs, single quotes, no trailing commas, print width 100
-- **ESLint 9** flat config with TypeScript + Svelte rules
+- **ESLint 10** flat config with TypeScript + Svelte rules
 - **Adapter**: `@sveltejs/adapter-auto`

@@ -22,25 +22,34 @@ Protected pages live under `src/routes/(authenticated)/`. Pages outside that gro
 
 ```ts
 export const handle: Handle = async ({ event, resolve }) => {
+	event.locals.session = null;
+
 	if (event.route.id === '/login') {
-		if (await getSession()) redirect(303, '/');
+		const result = await getSession();
+		if (result.error !== null) error(503, 'Unable to verify session. Please try again.');
+		if (result.data !== null) redirect(303, '/');
 		clearAuth(event);
 	}
 
 	if (event.route.id?.includes('/(authenticated)')) {
-		const session = await getSession();
-		if (!session) {
+		const result = await getSession();
+		if (result.error !== null) error(503, 'Unable to verify session. Please try again.');
+		if (result.data === null) {
 			clearAuth(event);
 			redirect(303, '/login');
 		}
-		event.locals.session = session;
+		event.locals.session = result.data;
 	}
 
 	return resolve(event);
 };
 ```
 
-`resolveSession(event)` is a proposed server-only helper that returns a verified session or `null`; implement it with the selected auth provider and declare the matching nullable `App.Locals.session` type in `src/app.d.ts`. `/login` and `/` are example destinations to align with the eventual routes. This example assumes the protected group contains pages; protect any server endpoints independently at their operation boundary as well.
+`getSession()` is a proposed server-only helper that reads credentials from the current request through `getRequestEvent()` and wraps the provider's session verification operation in `attempt<string, Session | null>`. It returns the awaited result envelope: `{ data: session, error: null }` for a verified session, `{ data: null, error: null }` for absent, invalid, or expired credentials, and `{ data: null, error: message }` for an operational failure. `Session` represents the eventual provider-backed session type. Normalize the provider's expected invalid/expired credential outcomes to a successful `null` result inside the operation; unexpected provider failures remain operation failures. Follow [attempt-pattern.md](attempt-pattern.md) for diagnostics and safe error messages.
+
+Callers inspect `result.error !== null` before using `result.data`; consume this result directly rather than wrapping `getSession()` in another `attempt`. Keep SvelteKit `error(...)` and `redirect(...)` calls outside the callback. The hook reports verification outages with a safe 503 response, preserving credentials so the user can retry, and only clears auth or redirects to sign-in after a successful anonymous result.
+
+`clearAuth(event)` clears the current request's auth cookies using the selected provider's cleanup APIs and sets `event.locals.session` to `null`. Implement both helpers with the selected auth provider and declare the matching nullable `App.Locals.session` type in `src/app.d.ts`. `/login` and `/` are example destinations to align with the eventual routes. This example assumes the protected group contains pages; protect any server endpoints independently at their operation boundary as well.
 
 Use `(authenticated)/+layout.server.ts` to return only the user fields needed by the UI. The layout can provide those fields to descendants through props or a per-tree context store. Layout loads supply UI data; each protected server operation still checks identity and permissions independently.
 
