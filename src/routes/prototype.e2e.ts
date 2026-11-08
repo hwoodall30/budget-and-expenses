@@ -1,4 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+async function rowAction(page: Page, description: string, action: string) {
+	await page.getByRole('button', { name: `Actions for ${description}`, exact: true }).click();
+	await page.getByRole('menuitem', { name: action, exact: true }).click();
+}
 
 for (const width of [390, 1280]) {
 	test(`entry and partial settlement at ${width}px`, async ({ page }) => {
@@ -13,7 +18,7 @@ for (const width of [390, 1280]) {
 		await page.getByRole('button', { name: 'Add purchase' }).click();
 		await expect(page.getByRole('status')).toHaveText('Added to sample data.');
 		await expect(page.getByTestId('available')).toHaveText('$1,507.25');
-		await page.getByRole('button', { name: 'Settle Classroom equipment' }).click();
+		await rowAction(page, 'Classroom equipment', 'Settle as actual');
 		await expect(page.getByLabel('Purchase date')).toHaveValue('2026-11-15');
 		await expect(page.getByLabel('Description', { exact: true })).toHaveValue(
 			'Classroom equipment'
@@ -25,17 +30,17 @@ for (const width of [390, 1280]) {
 		await expect(page.getByRole('status')).toHaveText('Settlement recorded in sample data.');
 		await expect(page.getByTestId('available')).toHaveText('$1,507.25');
 		await expect(page.getByText('Classroom equipment — remainder', { exact: true })).toBeVisible();
-		await page.getByRole('button', { name: 'Edit Classroom equipment', exact: true }).click();
+		await rowAction(page, 'Classroom equipment', 'Edit purchase');
 		await page.getByLabel('Description', { exact: true }).fill('Corrected equipment');
 		await page.getByLabel('Total (USD)', { exact: true }).fill('200');
 		await page.getByRole('button', { name: 'Update purchase', exact: true }).click();
 		await expect(page.getByRole('status')).toHaveText('Purchase updated in sample data.');
 		await expect(page.getByTestId('available')).toHaveText('$1,487.25');
-		await page.getByRole('button', { name: 'Delete Corrected equipment', exact: true }).click();
+		await rowAction(page, 'Corrected equipment', 'Delete');
 		await expect(page.getByTestId('available')).toHaveText('$1,687.25');
-		await expect(
-			page.getByRole('heading', { name: 'Corrected equipment', exact: true })
-		).toHaveCount(0);
+		await expect(page.getByRole('cell', { name: 'Corrected equipment', exact: true })).toHaveCount(
+			0
+		);
 		await expect(page.getByText('Classroom equipment — remainder', { exact: true })).toBeVisible();
 
 		expect(
@@ -62,12 +67,12 @@ test('split validation preserves edits; expected plans can be committed and full
 	await page.getByLabel('Amount 2 (USD)', { exact: true }).fill('40');
 	await page.getByRole('button', { name: 'Add purchase' }).click();
 	await expect(page.getByTestId('available')).toHaveText('$1,450.00');
-	await page.getByRole('button', { name: 'Edit Advent family resources' }).click();
+	await rowAction(page, 'Advent family resources', 'Edit plan');
 	await page.getByRole('combobox', { name: 'Record type', exact: true }).selectOption('committed');
 	await page.getByLabel('Total (USD)', { exact: true }).fill('250');
 	await page.getByRole('button', { name: 'Update plan' }).click();
 	await expect(page.getByTestId('available')).toHaveText('$1,200.00');
-	await page.getByRole('button', { name: 'Settle Advent family resources' }).click();
+	await rowAction(page, 'Advent family resources', 'Settle as actual');
 	await page.getByLabel('Description', { exact: true }).fill('Final family resources');
 	await page.getByLabel('Purchase date').fill('2026-11-10');
 	await page
@@ -83,18 +88,42 @@ test('split validation preserves edits; expected plans can be committed and full
 
 test('ordinary actuals are editable and all record types are deletable', async ({ page }) => {
 	await page.goto('/');
-	await page.getByRole('button', { name: 'Edit Volunteer appreciation meal', exact: true }).click();
+	await rowAction(page, 'Volunteer appreciation meal', 'Edit purchase');
 	await page.getByLabel('Total (USD)', { exact: true }).fill('80');
 	await page.getByLabel('Purchase date').fill('2026-10-16');
 	await page.getByRole('combobox', { name: 'Category 1', exact: true }).selectOption('Admin');
 	await page.getByRole('button', { name: 'Update purchase', exact: true }).click();
 	await expect(page.getByTestId('available')).toHaveText('$1,620.00');
-	await page
-		.getByRole('button', { name: 'Delete Volunteer appreciation meal', exact: true })
-		.click();
+	await rowAction(page, 'Volunteer appreciation meal', 'Delete');
 	await expect(page.getByTestId('available')).toHaveText('$1,700.00');
-	await page.getByRole('button', { name: 'Delete Classroom equipment', exact: true }).click();
+	await rowAction(page, 'Classroom equipment', 'Delete');
 	await expect(page.getByTestId('available')).toHaveText('$2,000.00');
-	await page.getByRole('button', { name: 'Delete Advent family resources', exact: true }).click();
+	await rowAction(page, 'Advent family resources', 'Delete');
 	await expect(page.getByText('No purchases or plans', { exact: true })).toBeVisible();
+});
+
+test('busy year paginates, searches, and keeps pages in range', async ({ page }) => {
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Load a busy year' }).click();
+	await expect(page.getByText('Showing 1–10 of 64')).toBeVisible();
+	await expect(page.locator('tbody tr')).toHaveCount(10);
+	await page.getByRole('button', { name: 'Go to next page' }).click();
+	await expect(page.getByText('Showing 11–20 of 64')).toBeVisible();
+	await page.getByLabel('Rows per page').selectOption('50');
+	await expect(page.getByText('Showing 1–50 of 64')).toBeVisible();
+	await page.getByRole('button', { name: 'Go to next page' }).click();
+	await expect(page.locator('tbody tr')).toHaveCount(14);
+	await page.getByLabel('Search records').fill('printer ink');
+	await expect(page.getByText('Showing 1–5 of 5')).toBeVisible();
+	await page.getByLabel('Search records').fill('nothing like this');
+	await expect(page.getByText('No records match')).toBeVisible();
+});
+
+test('theme can be switched to dark mode and persists', async ({ page }) => {
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Toggle theme' }).click();
+	await page.getByRole('menuitem', { name: 'Dark' }).click();
+	await expect(page.locator('html')).toHaveClass(/dark/);
+	await page.reload();
+	await expect(page.locator('html')).toHaveClass(/dark/);
 });

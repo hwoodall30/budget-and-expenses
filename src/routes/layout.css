@@ -1,7 +1,7 @@
 @import 'tailwindcss';
-@import "tw-animate-css";
-@import "shadcn-svelte/tailwind.css";
-@import "@fontsource-variable/inter";
+@import 'tw-animate-css';
+@import 'shadcn-svelte/tailwind.css';
+@import '@fontsource-variable/inter';
 
 @custom-variant dark (&:is(.dark *));
 @plugin '@tailwindcss/forms';
@@ -91,6 +91,7 @@
 	--color-chart-3: var(--chart-3);
 	--color-chart-2: var(--chart-2);
 	--color-chart-1: var(--chart-1);
+	--color-category: var(--category);
 	--color-ring: var(--ring);
 	--color-input: var(--input);
 	--color-border: var(--border);
@@ -116,6 +117,19 @@
 	--radius-2xl: calc(var(--radius) * 1.8);
 	--radius-3xl: calc(var(--radius) * 2.2);
 	--radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * Category colors: each category element sets `--category-hue` (computed from the
+ * category name in `#lib/helpers/category-color`). The theme owns lightness and
+ * chroma so every hue stays legible in light and dark mode.
+ */
+@utility category-tone {
+	--category: oklch(0.56 0.16 var(--category-hue, 250));
+
+	@variant dark {
+		--category: oklch(0.78 0.13 var(--category-hue, 250));
+	}
 }
 
 @layer base {

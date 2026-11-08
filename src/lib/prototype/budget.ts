@@ -52,6 +52,49 @@ export function createSampleBudget(): Budget {
 		purchases: seed.map((p, i) => ({ ...p, id: i + 1, originalEstimate: p.amount, history: [] }))
 	};
 }
+/** A fuller fictional year (dozens of records) for trying the table and pagination. */
+export function createBusySampleBudget(count = 64): Budget {
+	const items = [
+		'Snack restock',
+		'Craft supplies',
+		'Volunteer lunch',
+		'Curriculum license',
+		'Event decorations',
+		'Printer ink',
+		'Parent night dessert',
+		'Small group books',
+		'Welcome table flowers',
+		'Cable and adapters',
+		'Room signage',
+		'Training workshop'
+	];
+	const kinds: PurchaseInput['kind'][] = ['actual', 'actual', 'actual', 'committed', 'expected'];
+	const purchases: Purchase[] = Array.from({ length: count }, (_, i) => {
+		const amount = 1500 + ((i * 7919) % 38) * 500 + ((i * 31) % 4) * 25;
+		const category = categories[(i * 5) % categories.length];
+		const second = categories[(i * 5 + 3) % categories.length];
+		const split = i % 9 === 4;
+		const first = split ? Math.round(amount * 0.6) : amount;
+		const month = String((i % 12) + 1).padStart(2, '0');
+		const day = String(((i * 11) % 28) + 1).padStart(2, '0');
+		return {
+			id: i + 1,
+			description: `${items[i % items.length]} #${Math.floor(i / items.length) + 1}`,
+			date: `2026-${month}-${day}`,
+			amount,
+			kind: kinds[i % kinds.length],
+			allocations: split
+				? [
+						{ category, amount: first },
+						{ category: second, amount: amount - first }
+					]
+				: [{ category, amount }],
+			originalEstimate: amount,
+			history: []
+		};
+	});
+	return { annual: 2500000, nextId: count + 1, purchases };
+}
 export function recordPurchase(budget: Budget, input: PurchaseInput): Budget {
 	validate(input);
 	return {

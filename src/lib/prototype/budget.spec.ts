@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import {
 	createSampleBudget,
+	createBusySampleBudget,
 	recordPurchase,
 	balances,
 	editPlan,
@@ -220,4 +221,15 @@ test('deleting a settled actual removes its spending but preserves the remainder
 
 test.each([1, 2, 3])('any purchase or plan can be deleted (%s)', (id) => {
 	expect(deletePurchase(createSampleBudget(), id).purchases.map((p) => p.id)).not.toContain(id);
+});
+
+test('busy sample year contains many valid records', () => {
+	const budget = createBusySampleBudget();
+	expect(budget.purchases).toHaveLength(64);
+	expect(new Set(budget.purchases.map((p) => p.id)).size).toBe(64);
+	for (const { id, description, date, amount, kind, allocations } of budget.purchases)
+		expect(() =>
+			editPurchase(budget, id, { description, date, amount, kind, allocations })
+		).not.toThrow();
+	expect(balances(budget).available).toBeGreaterThan(0);
 });

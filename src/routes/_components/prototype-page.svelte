@@ -3,18 +3,22 @@
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as NativeSelect from '#lib/components/ui/native-select/index.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
-	import * as Empty from '#lib/components/ui/empty/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { PurchaseAllocationRows } from '#lib/components/app/purchase-allocations/index.js';
+	import { ModeToggle } from '#lib/components/app/mode-toggle/index.js';
+	import PurchasesTable from './purchases-table.svelte';
+	import CategoryReview from './category-review.svelte';
+	import { formatMoney as money } from '#lib/helpers/money.ts';
 
 	import { attempt } from '#lib/helpers/attempt.ts';
 	import {
 		balances,
 		categories,
 		createSampleBudget,
+		createBusySampleBudget,
 		editPurchase,
 		deletePurchase,
 		recordPurchase,
@@ -25,8 +29,6 @@
 	} from '#lib/prototype/budget.ts';
 	let budget = $state(createSampleBudget());
 	const totals = $derived(balances(budget));
-	const money = (cents: number) =>
-		new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
 	const today = () => {
 		const d = new Date();
 		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -148,7 +150,10 @@
 <div class="mx-auto max-w-7xl px-4 sm:px-8">
 	<header class="flex flex-wrap items-center justify-between gap-3 border-b py-6">
 		<p class="text-xs font-semibold tracking-widest">MINISTRY / STEWARDSHIP</p>
-		<Badge variant="secondary">Sample data only</Badge>
+		<div class="flex items-center gap-2">
+			<Badge variant="secondary">Sample data only</Badge>
+			<ModeToggle />
+		</div>
 	</header>
 	<main class="flex flex-col gap-6 py-8 sm:py-12">
 		<div class="flex flex-col justify-between gap-6 md:flex-row md:items-center">
@@ -168,7 +173,7 @@
 						discards them.</Card.Description
 					></Card.Header
 				>
-				<Card.Footer
+				<Card.Footer class="flex-wrap gap-2"
 					><Button
 						variant="outline"
 						onclick={() => {
@@ -176,6 +181,13 @@
 							resetForm();
 							notice = 'Sample data reset.';
 						}}>Reset sample data</Button
+					><Button
+						variant="ghost"
+						onclick={() => {
+							budget = createBusySampleBudget();
+							resetForm();
+							notice = 'Loaded a busy sample year.';
+						}}>Load a busy year</Button
 					></Card.Footer
 				>
 			</Card.Root>
@@ -380,111 +392,32 @@
 			</Card.Root>
 			<Card.Root class="min-w-0">
 				<Card.Header
-					><Card.Description>ACTUALS & WHAT’S AHEAD</Card.Description><Card.Title
-						><h2>Purchases & plans</h2></Card.Title
+					><Card.Description>ANNUAL CATEGORY REVIEW · 2026</Card.Description><Card.Title
+						><h2>Where the money goes</h2></Card.Title
 					><Card.Description
-						>{budget.purchases.length} records · Committed {money(totals.committed)} · Expected {money(
-							totals.expected
-						)}</Card.Description
+						>Spending and outstanding plans, without category budget limits.</Card.Description
 					></Card.Header
 				>
-				<Card.Content class="flex flex-col gap-4">
-					{#each budget.purchases as purchase (purchase.id)}
-						<Card.Root>
-							<Card.Header
-								><div class="flex items-center justify-between gap-3">
-									<Badge
-										variant={purchase.kind === 'actual'
-											? 'default'
-											: purchase.kind === 'committed'
-												? 'secondary'
-												: 'outline'}>{purchase.kind}</Badge
-									><strong>{money(purchase.amount)}</strong>
-								</div>
-								<Card.Title><h3 class="break-words">{purchase.description}</h3></Card.Title
-								><Card.Description
-									>{purchase.date} · {purchase.allocations
-										.map((a) => `${a.category} ${money(a.amount)}`)
-										.join(' / ')}</Card.Description
-								></Card.Header
-							>
-							<Card.Content
-								><details class="text-sm text-muted-foreground">
-									<summary class="cursor-pointer">Details & history</summary>
-									<div class="mt-3 flex flex-col gap-2">
-										<p>Original amount / estimate: {money(purchase.originalEstimate)}</p>
-										{#each purchase.history as revision, index (index)}<p>{revision}</p>{:else}<p>
-												No revisions yet.
-											</p>{/each}
-									</div>
-								</details></Card.Content
-							>
-							<Card.Footer class="flex-wrap gap-2">
-								<Button
-									variant="outline"
-									aria-label={`Edit ${purchase.description}`}
-									onclick={() => open(purchase, 'edit')}
-									>{purchase.kind === 'actual' ? 'Edit purchase' : 'Edit plan'}</Button
-								>
-								{#if purchase.kind !== 'actual'}<Button
-										variant="outline"
-										aria-label={`Settle ${purchase.description}`}
-										onclick={() => open(purchase, 'settle')}>Settle as actual</Button
-									>{/if}
-								<Button
-									variant="destructive"
-									aria-label={`Delete ${purchase.description}`}
-									onclick={() => remove(purchase.id)}>Delete</Button
-								>
-							</Card.Footer>
-						</Card.Root>
-					{:else}
-						<Empty.Root
-							><Empty.Header
-								><Empty.Title>No purchases or plans</Empty.Title><Empty.Description
-									>Add a purchase or plan using the entry form, or reset the sample data.</Empty.Description
-								></Empty.Header
-							></Empty.Root
-						>
-					{/each}
-				</Card.Content>
+				<Card.Content><CategoryReview purchases={budget.purchases} /></Card.Content>
 			</Card.Root>
 		</div>
-		<Card.Root>
+		<Card.Root class="min-w-0">
 			<Card.Header
-				><Card.Description>ANNUAL CATEGORY REVIEW · 2026</Card.Description><Card.Title
-					><h2>Where the money goes</h2></Card.Title
+				><Card.Description>ACTUALS & WHAT’S AHEAD</Card.Description><Card.Title
+					><h2>Purchases & plans</h2></Card.Title
 				><Card.Description
-					>Spending and outstanding plans, without category budget limits.</Card.Description
+					>{budget.purchases.length} records · Committed {money(totals.committed)} · Expected {money(
+						totals.expected
+					)}</Card.Description
 				></Card.Header
 			>
-			<Card.Content class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				{#each categories as category (category)}
-					{@const entries = budget.purchases.flatMap((p) =>
-						p.allocations
-							.filter((a) => a.category === category)
-							.map((a) => ({ ...a, kind: p.kind }))
-					)}
-					{#if entries.length}<Card.Root
-							><Card.Header><Card.Title><h3>{category}</h3></Card.Title></Card.Header><Card.Content
-								class="flex flex-col gap-2"
-								>{#each ['actual', 'committed', 'expected'] as status (status)}<p
-										class="flex justify-between gap-2 text-sm"
-									>
-										<span class="text-muted-foreground">{status}</span><strong
-											>{money(
-												entries
-													.filter((e) => e.kind === status)
-													.reduce((sum, e) => sum + e.amount, 0)
-											)}</strong
-										>
-									</p>{/each}</Card.Content
-							></Card.Root
-						>{/if}
-				{/each}
-				{#if !budget.purchases.length}<p class="text-sm text-muted-foreground">
-						No category spending or plans yet.
-					</p>{/if}
+			<Card.Content>
+				<PurchasesTable
+					purchases={budget.purchases}
+					onedit={(purchase) => open(purchase, 'edit')}
+					onsettle={(purchase) => open(purchase, 'settle')}
+					ondelete={(purchase) => remove(purchase.id)}
+				/>
 			</Card.Content>
 		</Card.Root>
 		<footer class="text-xs text-muted-foreground">

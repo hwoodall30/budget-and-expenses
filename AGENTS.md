@@ -46,6 +46,10 @@ Before adding or restructuring a page, store, or remote function, read
 
 Before adding or changing fallible operations or error handling on the server or client, read [agent-docs/attempt-pattern.md](agent-docs/attempt-pattern.md).
 
+## Styling
+
+Always prioritize using shadcn-svelte components and tailwind styling when possible.
+
 ## Key Config
 
 - **TypeScript**: strict mode, `moduleResolution: bundler`
