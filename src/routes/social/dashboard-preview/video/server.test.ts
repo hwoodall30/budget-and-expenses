@@ -8,7 +8,7 @@ import { GET, HEAD } from './+server';
 
 function event(range?: string) {
 	return {
-		request: new Request('https://example.com/social/dashboard-video.mp4', {
+		request: new Request('https://example.com/social/dashboard-preview/video', {
 			headers: range ? { Range: range } : {}
 		})
 	} as RequestEvent;
@@ -21,6 +21,8 @@ describe('share preview video delivery', () => {
 		expect(response.headers.get('content-type')).toBe('video/mp4');
 		expect(response.headers.get('content-length')).toBe('6');
 		expect(response.headers.get('accept-ranges')).toBe('bytes');
+		expect(response.headers.get('cache-control')).toBe('no-store, no-transform');
+		expect(response.headers.get('cloudflare-cdn-cache-control')).toBe('no-store');
 	});
 	it.each([
 		['bytes=1-3', 'bytes 1-3/6', [1, 2, 3]],

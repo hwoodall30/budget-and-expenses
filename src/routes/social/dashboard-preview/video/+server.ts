@@ -12,7 +12,10 @@ export const GET: RequestHandler = async ({ request }) => {
 		'Content-Type': 'video/mp4',
 		'Content-Length': String(size),
 		'Accept-Ranges': 'bytes',
-		'Cache-Control': 'public, max-age=3600, no-transform'
+		// Avoid CDN extension-based media caching, which altered range responses in production.
+		'Cache-Control': 'no-store, no-transform',
+		'CDN-Cache-Control': 'no-store',
+		'Cloudflare-CDN-Cache-Control': 'no-store'
 	});
 	const range = request.headers.get('range');
 	// Without a validator, If-Range must fall back to the complete representation.

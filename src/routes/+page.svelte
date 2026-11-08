@@ -6,7 +6,7 @@
 	const description =
 		'Plan thoughtfully. Record simply. See what’s available. Explore the ministry budget dashboard with fictional sample data.';
 	const image = $derived(new URL('/social/dashboard.jpg', page.url.origin).href);
-	const video = $derived(new URL('/social/dashboard-video.mp4', page.url.origin).href);
+	const video = $derived(new URL('/social/dashboard-preview/video', page.url.origin).href);
 </script>
 
 <svelte:head>

@@ -25,7 +25,7 @@ cannot be fetched by messaging services. Existing conversations may cache old pr
 Apple's metadata guidance:
 https://developer.apple.com/documentation/technotes/tn3156-create-rich-previews-for-messages
 
-The page now points to `/social/dashboard-video.mp4`, a server endpoint that provides
+The page now points to `/social/dashboard-preview/video`, a server endpoint that provides
 explicit `Content-Length`, `Accept-Ranges`, and `206 Partial Content` responses.
 The original deployed static URL returned `200` for byte-range requests. The new
 URL also avoids reusing the old cached asset response. This fixes delivery compatibility;
@@ -34,9 +34,16 @@ it does not establish that byte-range support was the sole cause of the Messages
 After deployment, verify:
 
 ```sh
-curl -i -H 'Range: bytes=0-1023' https://YOUR_HOST/social/dashboard-video.mp4 -o /tmp/preview-range
+curl -i -H 'Range: bytes=0-1023' https://YOUR_HOST/social/dashboard-preview/video -o /tmp/preview-range
 ```
 
 Expect `206`, `Content-Range: bytes 0-1023/404346`, and `Content-Length: 1024`
 (the total changes if the video is regenerated). Send a fresh link such as
 `https://YOUR_HOST/?preview=2` to test without reusing the original page URL.
+
+The video URL deliberately has no file extension and sends `no-store` for browser
+and CDN caches. In production, Cloudflare continued returning a complete `200`
+response for the previous `.mp4` endpoint, including on cache misses, despite the
+origin producing correct `206` responses locally. Verify the public endpoint after
+deployment rather than assuming origin behavior survives the proxy. CDN cache rules
+that override origin headers may still need adjustment in the deployment configuration.
