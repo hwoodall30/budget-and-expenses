@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-import { mkdir } from 'node:fs/promises';
+import { copyFile, mkdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 
 // Run against a local dev server. The page starts with fictional sample data.
@@ -53,6 +53,9 @@ try {
 // Native macOS encoder: no extra runtime dependency in the website.
 execFileSync(
 	'swift',
-	['scripts/encode-share-preview.swift', frames, 'static/social/dashboard.mp4'],
+	['scripts/encode-share-preview.swift', frames, 'src/lib/assets/dashboard-preview.mp4'],
 	{ stdio: 'inherit' }
 );
+
+// Keep the original public asset available for older cached previews.
+await copyFile('src/lib/assets/dashboard-preview.mp4', 'static/social/dashboard.mp4');
